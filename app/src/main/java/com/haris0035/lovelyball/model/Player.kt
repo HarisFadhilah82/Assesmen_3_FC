@@ -4,5 +4,5 @@ data class Player(
     val id: String,
     val nama: String,
     val no_punggung: String,
-    val imageId: String
+    val imageId: String,
 )
