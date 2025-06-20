@@ -85,12 +85,15 @@ fun MainScreen() {
     val context = LocalContext.current
     val dataStore = UserDataStore(context)
     val user by dataStore.userFlow.collectAsState(User())
-
+    var showPlayerDialog by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
     var bitmap: Bitmap? by remember { mutableStateOf(null) }
     val launcher = rememberLauncherForActivityResult(CropImageContract()) {
         bitmap = getCroppedImage(context.contentResolver, it)
+        if (bitmap != null) showPlayerDialog = true
     }
+
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -143,6 +146,14 @@ fun MainScreen() {
                 onDismissRequest = { showDialog = false }) {
                 CoroutineScope(Dispatchers.IO).launch { signOut(context, dataStore) }
                 showDialog = false
+            }
+        }
+        if (showPlayerDialog) {
+            PlayerDialog(
+                bitmap = bitmap,
+                onDismissRequest = { showPlayerDialog = false }) { nama, namaLatin ->
+                Log.d("TAMBAH", "$nama $namaLatin ditambahkan.")
+                showPlayerDialog = false
             }
         }
     }
