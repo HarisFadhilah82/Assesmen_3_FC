@@ -11,38 +11,17 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.credentials.exceptions.GetCredentialException
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -53,22 +32,14 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.credentials.ClearCredentialStateRequest
-import androidx.credentials.CredentialManager
-import androidx.credentials.CustomCredential
-import androidx.credentials.GetCredentialRequest
-import androidx.credentials.GetCredentialResponse
+import androidx.credentials.*
 import androidx.credentials.exceptions.ClearCredentialException
+import androidx.credentials.exceptions.GetCredentialException
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.canhub.cropper.CropImageContract
-import com.canhub.cropper.CropImageContractOptions
-import com.canhub.cropper.CropImageOptions
-import com.canhub.cropper.CropImageView
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
+import com.canhub.cropper.*
+import com.google.android.libraries.identity.googleid.*
 import com.haris0035.lovelyball.BuildConfig
 import com.haris0035.lovelyball.R
 import com.haris0035.lovelyball.model.Player
@@ -89,29 +60,29 @@ fun MainScreen() {
     val viewModel: MainViewModel = viewModel()
     val errorMessage by viewModel.errorMessage
 
-    var showPlayerDialog by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
+    var showPlayerDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var playerToDelete by remember { mutableStateOf<Player?>(null) }
+    var selectedPlayer by remember { mutableStateOf<Player?>(null) }
     var bitmap: Bitmap? by remember { mutableStateOf(null) }
+
     val launcher = rememberLauncherForActivityResult(CropImageContract()) {
         bitmap = getCroppedImage(context.contentResolver, it)
         if (bitmap != null) showPlayerDialog = true
     }
 
-
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(text = stringResource(id = R.string.app_name))
-                },
-                colors = TopAppBarDefaults.mediumTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.primary,
-                ),
+                title = { Text(stringResource(id = R.string.app_name)) },
                 actions = {
                     IconButton(onClick = {
                         if (user.email.isEmpty()) {
-                            CoroutineScope(Dispatchers.IO).launch { signIn(context, dataStore) }
+                            CoroutineScope(Dispatchers.IO).launch {
+                                signIn(context, dataStore)
+                            }
                         } else {
                             showDialog = true
                         }
@@ -123,43 +94,89 @@ fun MainScreen() {
                         )
                     }
                 }
-
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = {val options = CropImageContractOptions(
-                null, CropImageOptions(
-                    imageSourceIncludeGallery = false,
-                    imageSourceIncludeCamera = true,
-                    fixAspectRatio = true
+            FloatingActionButton(onClick = {
+                val options = CropImageContractOptions(
+                    null,
+                    CropImageOptions(
+                        imageSourceIncludeGallery = false,
+                        imageSourceIncludeCamera = true,
+                        fixAspectRatio = true
+                    )
                 )
-            )
-                launcher.launch(options)}) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = stringResource(id = R.string.tambah_pemain)
-                )
+                launcher.launch(options)
+            }) {
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.tambah_pemain))
             }
         }
     ) { innerPadding ->
-        ScreenContent(viewModel,user.email,Modifier.padding(innerPadding))
+        ScreenContent(
+            viewModel = viewModel,
+            userId = user.email,
+            modifier = Modifier.padding(innerPadding),
+            onEdit = {
+                selectedPlayer = it
+                showEditDialog = true
+            },
+            onDelete = {
+                playerToDelete = it
+                showDeleteDialog = true
+            }
+        )
 
         if (showDialog) {
             ProfilDialog(
                 user = user,
                 onDismissRequest = { showDialog = false }) {
-                CoroutineScope(Dispatchers.IO).launch { signOut(context, dataStore) }
+                CoroutineScope(Dispatchers.IO).launch {
+                    signOut(context, dataStore)
+                }
                 showDialog = false
             }
         }
+
         if (showPlayerDialog) {
             PlayerDialog(
                 bitmap = bitmap,
-                onDismissRequest = { showPlayerDialog = false }) { nama, namaLatin ->
-                viewModel.saveData(user.email, nama, namaLatin, bitmap!!)
+                onDismissRequest = { showPlayerDialog = false }
+            ) { nama, nomor ->
+                viewModel.saveData(user.email, nama, nomor, bitmap!!)
                 showPlayerDialog = false
             }
         }
+
+        if (showEditDialog && selectedPlayer != null) {
+            EditPlayerDialog(
+                player = selectedPlayer!!,
+                onDismissRequest = {
+                    showEditDialog = false
+                    selectedPlayer = null
+                },
+                onConfirm = { nama, nomor ->
+                    viewModel.updatePlayerWithoutImage(user.email, selectedPlayer!!.id, nama, nomor)
+                    showEditDialog = false
+                    selectedPlayer = null
+                }
+            )
+        }
+
+        if (showDeleteDialog && playerToDelete != null) {
+            PlayerDeleteDialog(
+                playerName = playerToDelete!!.nama,
+                onDismissRequest = { showDeleteDialog = false },
+                onDeleteConfirmed = {
+                    viewModel.deletePlayer(
+                        userId = user.email,
+                        playerId = playerToDelete!!.id
+                    )
+                    showDeleteDialog = false
+                    playerToDelete = null
+                }
+            )
+        }
+
         if (errorMessage != null) {
             Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
             viewModel.clearMessage()
@@ -168,7 +185,13 @@ fun MainScreen() {
 }
 
 @Composable
-fun ScreenContent(viewModel: MainViewModel,userId:String,modifier: Modifier = Modifier) {
+fun ScreenContent(
+    viewModel: MainViewModel,
+    onEdit: (Player) -> Unit,
+    userId: String,
+    onDelete: (Player) -> Unit,
+    modifier: Modifier = Modifier
+) {
     val data by viewModel.data
     val status by viewModel.status.collectAsState()
 
@@ -194,7 +217,13 @@ fun ScreenContent(viewModel: MainViewModel,userId:String,modifier: Modifier = Mo
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
-                items(data) { ListItem(player = it) }
+                items(data) { player ->
+                    ListItem(
+                        player = player,
+                        onEdit = { onEdit(player) },
+                        onDelete = { onDelete(player) }
+                    )
+                }
             }
         }
 
@@ -217,6 +246,61 @@ fun ScreenContent(viewModel: MainViewModel,userId:String,modifier: Modifier = Mo
     }
 }
 
+@Composable
+fun ListItem(
+    player: Player,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .padding(4.dp)
+            .border(1.dp, Color.Gray),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(PlayerApi.getPlayerUrl(player.imageId))
+                .crossfade(true)
+                .build(),
+            contentDescription = stringResource(R.string.gambar, player.nama),
+            contentScale = ContentScale.Crop,
+            placeholder = painterResource(id = R.drawable.baseline_downloading_24),
+            error = painterResource(id = R.drawable.baseline_broken_image_24),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp)
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0f, 0f, 0f, 0.5f))
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = player.nama,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Text(
+                text = "No. ${player.no_punggung}",
+                fontStyle = FontStyle.Italic,
+                fontSize = 14.sp,
+                color = Color.White
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White)
+                }
+            }
+        }
+    }
+}
+
 private suspend fun signIn(context: Context, dataStore: UserDataStore) {
     val googleIdOption: GetGoogleIdOption = GetGoogleIdOption.Builder()
         .setFilterByAuthorizedAccounts(false)
@@ -230,7 +314,7 @@ private suspend fun signIn(context: Context, dataStore: UserDataStore) {
     try {
         val credentialManager = CredentialManager.create(context)
         val result = credentialManager.getCredential(context, request)
-        handleSignIn(result,dataStore)
+        handleSignIn(result, dataStore)
     } catch (e: GetCredentialException) {
         Log.e("SIGN-IN", "Error: ${e.errorMessage}")
     }
@@ -255,6 +339,7 @@ private suspend fun handleSignIn(
         }
     }
 }
+
 private suspend fun signOut(context: Context, dataStore: UserDataStore) {
     try {
         val credentialManager = CredentialManager.create(context)
@@ -266,6 +351,7 @@ private suspend fun signOut(context: Context, dataStore: UserDataStore) {
         Log.e("SIGN-IN", "Error: ${e.errorMessage}")
     }
 }
+
 private fun getCroppedImage(
     resolver: ContentResolver,
     result: CropImageView.CropResult
@@ -284,48 +370,3 @@ private fun getCroppedImage(
         ImageDecoder.decodeBitmap(source)
     }
 }
-
-@Composable
-fun ListItem(player: Player) {
-    Box(
-        modifier = Modifier
-            .padding(4.dp)
-            .border(1.dp, Color.Gray),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(PlayerApi.getPlayerUrl(player.imageId))
-                .crossfade(true)
-                .build(),
-            contentDescription = stringResource(R.string.gambar, player.nama),
-            contentScale = ContentScale.Crop,
-            placeholder = painterResource(id = R.drawable.baseline_downloading_24),
-            error = painterResource(id = R.drawable.baseline_broken_image_24),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(4.dp)
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(4.dp)
-                .background(Color(red = 0f, green = 0f, blue = 0f, alpha = 0.5f))
-                .padding(4.dp)
-        ) {
-            Text(
-                text = player.nama,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Text(
-                text = player.no_punggung,
-                fontStyle = FontStyle.Italic,
-                fontSize = 14.sp,
-                color = Color.White
-            )
-        }
-
-    }
-}
-

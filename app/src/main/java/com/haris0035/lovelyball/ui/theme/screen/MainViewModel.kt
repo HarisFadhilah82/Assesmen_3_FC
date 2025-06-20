@@ -23,7 +23,7 @@ class MainViewModel : ViewModel() {
         private set
     var errorMessage = mutableStateOf<String?>(null)
 
-    fun retrieveData(userId:String) {
+    fun retrieveData(userId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             status.value = ApiStatus.LOADING
             try {
@@ -35,17 +35,18 @@ class MainViewModel : ViewModel() {
             }
         }
     }
-    fun saveData(UserId: String, nama: String, no_punggung: String, bitmap: Bitmap) {
+
+    fun saveData(userId: String, nama: String, noPunggung: String, bitmap: Bitmap) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val result = PlayerApi.service.postPlayer(
-                    UserId,
+                    userId,
                     nama.toRequestBody("text/plain".toMediaTypeOrNull()),
-                    no_punggung.toRequestBody("text/plain".toMediaTypeOrNull()),
+                    noPunggung.toRequestBody("text/plain".toMediaTypeOrNull()),
                     bitmap.toMultipartBody()
                 )
                 if (result.status == "success")
-                    retrieveData(UserId)
+                    retrieveData(userId)
                 else
                     throw Exception(result.message)
             } catch (e: Exception) {
@@ -55,14 +56,63 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    fun updatePlayerWithoutImage(
+        userId: String,
+        playerId: String,
+        nama: String,
+        noPunggung: String,
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val result = PlayerApi.service.updatePlayerWithoutImage(
+                    userId,
+                    playerId.toRequestBody("text/plain".toMediaTypeOrNull()),
+                    nama.toRequestBody("text/plain".toMediaTypeOrNull()),
+                    noPunggung.toRequestBody("text/plain".toMediaTypeOrNull())
+                )
+
+                if (result.status == "success") {
+                    retrieveData(userId)
+                } else {
+                    throw Exception(result.message)
+                }
+            } catch (e: Exception) {
+                Log.d("MainViewModel", "Update failed: ${e.message}")
+                errorMessage.value = "Error: ${e.message}"
+            }
+        }
+    }
+
+    fun deletePlayer(userId: String, playerId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val result = PlayerApi.service.deletePlayer(userId, playerId)
+                if (result.status == "success") {
+                    retrieveData(userId)
+                } else {
+                    throw Exception(result.message)
+                }
+            } catch (e: Exception) {
+                Log.d("MainViewModel", "Delete failed: ${e.message}")
+                errorMessage.value = "Error: ${e.message}"
+            }
+        }
+    }
+
+
+
+
+
     private fun Bitmap.toMultipartBody(): MultipartBody.Part {
         val stream = ByteArrayOutputStream()
         compress(Bitmap.CompressFormat.JPEG, 80, stream)
         val byteArray = stream.toByteArray()
-        val requestBody = byteArray.toRequestBody(
-            "image/jpg".toMediaTypeOrNull(), 0, byteArray.size)
-        return MultipartBody.Part.createFormData(
-            "image", "image.jpg", requestBody)
+        val requestBody =
+            byteArray.toRequestBody("image/jpg".toMediaTypeOrNull(), 0, byteArray.size)
+        return MultipartBody.Part.createFormData("image", "image.jpg", requestBody)
     }
-    fun clearMessage(){errorMessage.value = null}
+
+    fun clearMessage() {
+        errorMessage.value = null
+    }
 }
