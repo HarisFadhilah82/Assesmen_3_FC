@@ -22,14 +22,12 @@ class MainViewModel : ViewModel() {
     var status = MutableStateFlow(ApiStatus.LOADING)
         private set
     var errorMessage = mutableStateOf<String?>(null)
-    init {
-        retrieveData()
-    }
-    fun retrieveData() {
+
+    fun retrieveData(userId:String) {
         viewModelScope.launch(Dispatchers.IO) {
             status.value = ApiStatus.LOADING
             try {
-                data.value = PlayerApi.service.getPlayer()
+                data.value = PlayerApi.service.getPlayer(userId)
                 status.value = ApiStatus.SUCCESS
             } catch (e: Exception) {
                 Log.d("MainViewModel", "Failure: ${e.message}")
@@ -37,17 +35,17 @@ class MainViewModel : ViewModel() {
             }
         }
     }
-    fun saveData(id: String, nama: String, no_punggung: String, bitmap: Bitmap) {
+    fun saveData(UserId: String, nama: String, no_punggung: String, bitmap: Bitmap) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val result = PlayerApi.service.postPlayer(
-                    id,
+                    UserId,
                     nama.toRequestBody("text/plain".toMediaTypeOrNull()),
                     no_punggung.toRequestBody("text/plain".toMediaTypeOrNull()),
                     bitmap.toMultipartBody()
                 )
                 if (result.status == "success")
-                    retrieveData()
+                    retrieveData(UserId)
                 else
                     throw Exception(result.message)
             } catch (e: Exception) {

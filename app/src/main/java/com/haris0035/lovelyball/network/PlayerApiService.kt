@@ -26,7 +26,9 @@
 
     interface PlayerApiService {
         @GET("pemain_bola.php")
-        suspend fun getPlayer(): List<Player>
+        suspend fun getPlayer(
+            @Header("Authorization")userID: String
+        ): List<Player>
 
         @Multipart
         @POST("pemain_bola.php")
