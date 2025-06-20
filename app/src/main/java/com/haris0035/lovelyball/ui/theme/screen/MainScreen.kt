@@ -53,8 +53,10 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingExcept
 import com.haris0035.lovelyball.BuildConfig
 import com.haris0035.lovelyball.R
 import com.haris0035.lovelyball.model.Player
+import com.haris0035.lovelyball.model.User
 import com.haris0035.lovelyball.network.ApiStatus
 import com.haris0035.lovelyball.network.PlayerApi
+import com.haris0035.lovelyball.network.UserDataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -63,6 +65,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun MainScreen() {
     val context = LocalContext.current
+    val dataStore = UserDataStore(context)
+    val user by dataStore.userFlow.collectAsState(User())
     Scaffold(
         topBar = {
             TopAppBar(
@@ -74,7 +78,13 @@ fun MainScreen() {
                     titleContentColor = MaterialTheme.colorScheme.primary,
                 ),
                 actions = {
-                    IconButton(onClick = { CoroutineScope(Dispatchers.IO).launch { signIn(context) }}) {
+                    IconButton(onClick = {
+                        if (user.email.isEmpty()) {
+                            CoroutineScope(Dispatchers.IO).launch { signIn(context, dataStore) }
+                        } else {
+                            Log.d("SIGN-IN", "User:$user")
+                        }
+                    }) {
                         Icon(
                             painter = painterResource(R.drawable.baseline_account_circle_24),
                             contentDescription = stringResource(R.string.profil),
@@ -137,7 +147,7 @@ fun ScreenContent(modifier: Modifier = Modifier) {
     }
 }
 
-private suspend fun signIn(context: Context) {
+private suspend fun signIn(context: Context, dataStore: UserDataStore) {
     val googleIdOption: GetGoogleIdOption = GetGoogleIdOption.Builder()
         .setFilterByAuthorizedAccounts(false)
         .setServerClientId(BuildConfig.API_KEY)
@@ -150,24 +160,29 @@ private suspend fun signIn(context: Context) {
     try {
         val credentialManager = CredentialManager.create(context)
         val result = credentialManager.getCredential(context, request)
+        handleSignIn(result,dataStore)
     } catch (e: GetCredentialException) {
         Log.e("SIGN-IN", "Error: ${e.errorMessage}")
     }
 }
 
-private fun handleSignIn(result: GetCredentialResponse) {
+private suspend fun handleSignIn(
+    result: GetCredentialResponse,
+    dataStore: UserDataStore
+) {
     val credential = result.credential
     if (credential is CustomCredential &&
         credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
     ) {
         try {
             val googleId = GoogleIdTokenCredential.createFrom(credential.data)
-            Log.d("SIGN-IN", "User email: ${googleId.id}")
+            val nama = googleId.displayName ?: ""
+            val email = googleId.id
+            val photoUrl = googleId.profilePictureUri.toString()
+            dataStore.savedata(User(nama, email, photoUrl))
         } catch (e: GoogleIdTokenParsingException) {
             Log.e("SIGN-IN", "Error: ${e.message}")
         }
-    } else {
-        Log.e("SIGN-IN", "Error: unrecognized custom credential type.")
     }
 }
 

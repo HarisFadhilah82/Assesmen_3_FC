@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">lovelyball</string>
+    <string name="gambar">Gambar</string>
+    <string name="error">Gagal memuat data.. koneksi error</string>
+    <string name="try_again">Coba Lagi</string>
+    <string name="profil">peofil</string>
 </resources>
